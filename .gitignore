@@ -1,6 +1,9 @@
 data/
 *.pt
+*.csv
 model/thyroidemb/pedraza
+model/thyroidemb/pedraza2
+model/thyroidemb/mixed
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

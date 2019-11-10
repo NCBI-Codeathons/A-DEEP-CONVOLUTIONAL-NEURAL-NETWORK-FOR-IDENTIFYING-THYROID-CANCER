@@ -97,14 +97,14 @@ def train_model(model, criterion, optimizer, scheduler, dataloaders, dataset_siz
 def main(args):
     data_transforms = {
         'train': transforms.Compose([
-            GoodCropTransform((85,10,390,300)),
+            GoodCropTransform((110,10,330,300)),
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),
         'test': transforms.Compose([
-            GoodCropTransform((85,10,390,300)),
+            GoodCropTransform((110,10,330,300)),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),

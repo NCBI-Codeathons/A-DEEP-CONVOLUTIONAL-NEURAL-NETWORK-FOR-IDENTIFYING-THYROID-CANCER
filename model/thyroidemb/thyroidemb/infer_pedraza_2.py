@@ -5,28 +5,32 @@ import argparse
 import os
 import json
 import tqdm
-
 from torchvision import datasets, models, transforms
 
-def main(args):
+def main(args: argparse.Namespace) -> None:
     BATCH_SIZE = 32
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model_ft = models.mobilenet_v2(pretrained=False)
-    model_ft.classifier = nn.Linear(1280,1)
-    model_ft = model_ft.to(device)
     
-    # model_ft = models.wide_resnet50_2(pretrained=False)
-    # num_ftrs = model_ft.fc.in_features
-    # model_ft.fc = nn.Linear(num_ftrs, 2)
-    # model_ft = model_ft.to(device)
-
+    if args.arch == 'resnet':
+        model_ft = models.resnet50(pretrained=False)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs, 1)
+        model_ft = model_ft.to(device)
+        feature_model = nn.Sequential(*list(model_ft.children())[:-1])
+    else:
+        model_ft = models.mobilenet_v2(pretrained=False)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.classifier = nn.Linear(num_ftrs,1)
+        model_ft = model_ft.to(device)
+        feature_model = lambda x: model_ft.features(x).mean([2, 3])
+    
     model_file = os.path.abspath(args.model_file)
     model_ft.load_state_dict(torch.load(model_file))
 
     data_dir = os.path.abspath(args.data_dir)
 
     xform = transforms.Compose([
-            transforms.Resize((390,300)),
+            transforms.CenterCrop((288,288)),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
@@ -43,28 +47,18 @@ def main(args):
     num_pred = 0
     out_file = os.path.abspath(args.out_file)
     with open(out_file, 'w') as out_fp:
+        column_names = ['idx','prob0','target'] + ["val{}".format(x) for x in range(num_ftrs)]
+        out_fp.write(','.join(column_names)+'\n')
         for i, (inputs, labels) in tqdm.tqdm(enumerate(dataloader)):
             inputs = inputs.to(device)
-            probs = F.softmax(model_ft(inputs),dim=1).cpu()
-            _, preds = torch.max(inputs, dim=1)
-            features = model_ft.features(inputs).mean([2, 3]).cpu()
-            # running_corrects += torch.sum(preds == labels.data)
+            probs = F.sigmoid(model_ft(inputs)).cpu()
+            # features = model_ft.features(inputs).mean([2, 3]).cpu()
+            features = feature_model(inputs).cpu()
             for offset in range(probs.shape[0]):
                 out_arr = [i + offset, probs[offset].tolist()[0], labels[offset].tolist()]
-                out_arr.extend(features[offset].tolist())
+                out_arr.extend(features[offset].squeeze().tolist())
                 out_arr = [str(x) for x in out_arr]
                 out_fp.write(",".join(out_arr)+'\n')
-                # example = {
-                #     "idx": str(i + offset),
-                #     "probabilities": probs[offset].tolist(),
-                #     "features": features[offset].tolist(),
-                #     "target": labels[offset].tolist(),
-                # }
-                # json.dump(example, out_fp)
-                # num_pred += 1
-
-
-    # print("Accuracy: %0.3f" % (running_corrects.double()/num_pred))
 
 
 if __name__ == "__main__":
@@ -73,6 +67,7 @@ if __name__ == "__main__":
     '''
     parser = argparse.ArgumentParser('Make metafile for pedraza Pedraza dataset')
     parser.add_argument('--data-dir', default=os.environ['DATA_DIR'])
+    parser.add_argument('--arch',default='mobilenet',help='Model architecture')
     parser.add_argument('model_file', help='Pretrained model weights')
     parser.add_argument('out_file')
     args = parser.parse_args()
