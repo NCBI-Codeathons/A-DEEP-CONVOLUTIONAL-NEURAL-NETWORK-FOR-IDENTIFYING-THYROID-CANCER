@@ -1,5 +1,5 @@
 absl-py==0.8.1
-certifi==2019.9.11
+certifi==2022.12.7
 cffi==1.13.1
 google-pasta==0.1.8
 Keras-Applications==1.0.8
